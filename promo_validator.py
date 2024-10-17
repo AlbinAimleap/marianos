@@ -1,5 +1,5 @@
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 from pathlib import Path
 import json
 import argparse
@@ -64,20 +64,43 @@ class PromoProcessor:
             (r'Save\s+\$(?P<savings>\d+(?:\.\d{2})?)', self._process_savings),
             
             # Match patterns like "$12/lb"
-            (r'\$(?P<price_per_lb>\d+(?:\.\d{2})?)\/lb', self._process_price_per_lb)
+            (r'\$(?P<price_per_lb>\d+(?:\.\d{2})?)\/lb', self._process_price_per_lb),
+            
+            # Match patterns like "$12.99 price each when you buy 2" or "$10.99 price each with 2 Keurig K-Cup pods" or "$14.99 price each for 2 Peet's coffee K-Cup pods - 22ct"
+            (r'\$(?P<price>\d+(?:\.\d{2})?)\s+price\s+each\s+(?:when\s+you\s+buy|with|for)\s+(?P<quantity>\d+)', self._process_price_each_with_quantity),
+            
+            # Match patterns like "$1.69 price on select Noosa yoghurt - 8oz"
+            (r'\$(?P<price>\d+(?:\.\d{2})?)\s+price\s+on\s+select\s+(?P<product>[\w\s-]+)', self._process_select_product_price),
+            
+            # Match patterns like "Save 20% on Trick-or-Treat candy"
+            (r'Save\s+(?P<discount>\d+)%\s+on\s+(?P<product>[\w\s-]+)', self._process_percentage_discount),
+            
+            # Match patterns like "10% off Oreo halloween trick or treat bag"
+            (r'(?P<discount>\d+)%\s+off\s+(?P<product>[\w\s-]+)', self._process_percentage_discount),
             
         ]
 
-    def process(self, item: Dict) -> Dict:
+    def process(self, items: Union[Dict, List[Dict]]) -> Union[Dict, List[Dict]]:
+        """Process single dict item or list of dict items and calculate the promo price and unit price based on promo description."""
+        if isinstance(items, dict):
+            return self._process_item(items)
+        elif isinstance(items, list):
+            return [self._process_item(item) for item in items]
+        else:
+            raise ValueError("Input must be a dictionary or a list of dictionaries")
+
+    def _process_item(self, item: Dict) -> Dict:
         """Process each item and calculate the promo price and unit price based on promo description."""
         volume_deals_description = item.get("volume_deals_description", "")
-        price = item.get("sale_price") or item.get("regular_price")
+        price = item.get("sale_price", "") or item.get("regular_price", "")
+        price = price.replace("$", "").replace(",", "") if isinstance(price, str) else price
         try:
             weight = float(item.get("weight", "0").split()[0])
         except:
             weight = 1
         for pattern, processor in self.patterns:
             if match := re.search(pattern, volume_deals_description, re.IGNORECASE):
+
                 try:
                     processed_data = processor(match, float(price), weight)
                     item.update(processed_data) 
@@ -87,9 +110,29 @@ class PromoProcessor:
         else:
             item["volume_deals_price"] = ""
             item["unit_price"] = ""
-
-        self.results.append(item)
         return item
+    
+    
+    def _process_select_product_price(self, match: re.Match, price: float, weight: float = None) -> Dict:
+        """Process '$X price on select Product' type promotions."""
+        select_price = float(match.group('price'))
+        
+        return {
+            "volume_deals_price": round(select_price, 2),
+            "unit_price": round(select_price / weight if weight else select_price, 2)
+        }
+    
+    def _process_price_each_with_quantity(self, match: re.Match, price: float, weight: float = None) -> Dict:
+        """Process '$X price each with Y' type promotions."""
+        price_each = float(match.group('price'))
+        quantity = int(match.group('quantity'))
+        total_price = price_each * quantity
+        
+        return {
+            "volume_deals_price": round(total_price, 2),
+            "unit_price": round(price_each, 2)
+        }
+    
     
     def _process_price_per_lb(self, match: re.Match, price: float, weight: float = None) -> Dict:
         """Process '$X/lb' type promotions."""
@@ -313,9 +356,9 @@ def main():
 
 if __name__ == "__main__":
     item = {
-        "regular_price": "$8.49",
+        "regular_price": "$13.99",
         "sale_price": "",
-        "volume_deals_description": "$8.49 When you buy TWO (2) BOXES",
+        "volume_deals_description": "$10.99 price each with 2  Keurig K-Cup pods",
     }
     processor = PromoProcessor()
     print(processor.process(item))
