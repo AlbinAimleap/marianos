@@ -12,18 +12,12 @@ class BuyGetDiscountProcessor(PromoProcessor):
         """Calculate promotion price for 'Buy X get Y% off' promotions."""
         
         item_data = item.copy()
-        price = item_data.get("regular_price", 0)
-        weight = item_data.get("weight")
+        price = item_data.get("sale_price") or item_data.get("regular_price", 0)
         quantity = int(match.group('quantity'))
-        discount_percentage = int(match.group('discount'))
+        discount_percentage = int(match.group('discount')) 
         
-        if weight:
-            weight = float(weight.split()[0])
-            volume_deals_price = price * weight * (1 - discount_percentage / 100)
-            unit_price = volume_deals_price / weight
-        else:
-            volume_deals_price = price * quantity * (1 - discount_percentage / 100)
-            unit_price = volume_deals_price / quantity
+        volume_deals_price = (price * quantity) - ((price * quantity) * (discount_percentage / 100))
+        unit_price = volume_deals_price / quantity
         
         item_data['volume_deals_price'] = round(volume_deals_price, 2)
         item_data['unit_price'] = round(unit_price, 2)
@@ -35,20 +29,14 @@ class BuyGetDiscountProcessor(PromoProcessor):
         """Calculate the final price after applying a coupon discount."""
         
         item_data = item.copy()
-        
-        price = item_data.get("regular_price", 0)
-        weight = item_data.get("weight")
+        price = item_data.get("sale_price") or item_data.get("regular_price", 0)
         quantity = int(match.group('quantity'))
-        discount_percentage = int(match.group('discount'))
+        discount_percentage = int(match.group('discount')) 
         
-        if weight:
-            volume_deals_price = price * weight * (1 - discount_percentage / 100)
-            unit_price = volume_deals_price / weight
-        else:
-            volume_deals_price = price * quantity * (1 - discount_percentage / 100)
-            unit_price = volume_deals_price / quantity
+        volume_deals_price = (price * quantity) - ((price * quantity) * (discount_percentage / 100))
+        unit_price = volume_deals_price / quantity
 
-        item_data['digital_coupon_price'] = round(unit_price, 2)
+        item_data['digital_coupon_price'] = round(volume_deals_price, 2)
         item_data['unit_price'] = round(unit_price, 2)
         
         return item_data
