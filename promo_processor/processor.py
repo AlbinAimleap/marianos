@@ -31,6 +31,7 @@ class PromoProcessor(ABC):
                     "Co Squared", "Best Occasions", "Mash-Up Coffee", "World Table"])
     }
     _compiled_patterns = {}
+    _pre_processors = []
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
@@ -45,6 +46,11 @@ class PromoProcessor(ABC):
     @classmethod
     def apply(cls, func: Callable[[List[Dict[str, Any]]], List[Dict[str, Any]]]) -> T:
         cls.results = func(cls.results)
+        return cls
+    
+    @classmethod
+    def pre_process(cls, func: Callable[[List[Dict[str, Any]]], List[Dict[str, Any]]]) -> T:
+        cls._pre_processors.append(func)
         return cls
 
     def update_save(self):
@@ -77,6 +83,9 @@ class PromoProcessor(ABC):
 
     @classmethod
     def process_item(cls, item_data: Dict[str, Any]) -> T:
+        if cls._pre_processors:
+            for pre_processor in cls._pre_processors:
+                item_data = pre_processor(item_data)
         if isinstance(item_data, list):
             with ThreadPoolExecutor() as executor:
                 processed_items = list(executor.map(cls.process_single_item, item_data))

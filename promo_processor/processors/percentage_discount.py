@@ -2,6 +2,7 @@ from promo_processor.processor import PromoProcessor
 
 class PercentageDiscountProcessor(PromoProcessor):
     patterns = [
+        r"^(?P<discount>20)%\s+off",
         r"^Deal:\s+(?P<discount>\d+)%\s+off", 
         r"^Save\s+(?P<discount>\d+)%\s+on\s+(?P<product>[\w\s-]+)",
         r"^Save\s+(?P<discount>\d+)%\s+off\s+(?P<product>[\w\s-]+)",

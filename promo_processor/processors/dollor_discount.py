@@ -12,7 +12,7 @@ class DollarDiscountProcessor(PromoProcessor):
         
         item_data = item.copy()
         discount_value = float(match.group('discount'))
-        price = item_data.get('price', 0)  
+        price = item_data.get("sale_price") or item_data.get("regular_price", 0) 
         volume_deals_price = price - discount_value
         
         item_data["volume_deals_price"] = round(volume_deals_price, 2)
@@ -20,7 +20,7 @@ class DollarDiscountProcessor(PromoProcessor):
         item_data["digital_coupon_price"] = ""
         return item_data
         
-
+ 
     def calculate_coupon(self, item, match):
         """Process '$X off' type promotions for coupons."""
         item_data = item.copy()

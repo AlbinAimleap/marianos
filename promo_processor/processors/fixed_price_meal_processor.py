@@ -4,7 +4,7 @@ import re
 
 class FixedPriceMealProcessor(PromoProcessor):
     patterns = [
-        r'\$(?P<price>\d+\.?\d*)'
+        r'^\$(?P<price>\d+\.?\d*)$'
     ]
     
     def calculate_deal(self, item: Dict[str, Any], match: re.Match) -> Dict[str, Any]:
