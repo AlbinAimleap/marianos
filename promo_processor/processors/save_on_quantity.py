@@ -3,11 +3,9 @@ from promo_processor.processor import PromoProcessor
 
 class SaveOnQuantityProcessor(PromoProcessor):
     patterns = [
-        r"\$(?P<total_price>\d+(?:\.\d+)?)\s+SAVE\s+\$(?P<discount>\d+(?:\.\d+)?)\s+on\s+(?P<quantity>\w+)\s+\(\d+\)", 
-        r"Save\s+\$(?P<discount>\d+(?:\.\d+)?)\s+on\s+(?P<quantity>\d+)\s+(?P<product>[\w\s-]+)" 
+        r"\$(?P<total_price>\d+(?:\.\d+)?)\s+SAVE\s+\$(?P<discount>\d+(?:\.\d+)?)\s+on\s+(?P<quantity>\w+)\s+\(\d+\)",
+        r"(?i)SAVE\s+\$(?P<discount>\d+(?:\.\d+)?)\s+on\s+(?P<quantity>\d+)\s+(?P<product>[\w\s-]+)"
     ]
-    
-    
 
     def calculate_deal(self, item, match):
         """Process '$X SAVE $Y on Z' type promotions."""
@@ -30,7 +28,10 @@ class SaveOnQuantityProcessor(PromoProcessor):
     def calculate_coupon(self, item, match):
         """Calculate the price after applying a coupon discount for Save $X on Y promotions."""
         item_data = item.copy()
-        price = item_data.get("unit_price", 0)
+        unit_price = item_data.get("unit_price") or item_data.get("sale_price") or item_data.get("regular_price", 0)
+        if isinstance(unit_price, str) and not unit_price:
+            unit_price = 0
+        price = float(unit_price)
         quantity = float(match.group('quantity'))
         discount = float(match.group('discount'))
         

@@ -1,6 +1,5 @@
 import asyncio
 import aiohttp
-import requests
 import json
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -10,8 +9,6 @@ import logging
 import re
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-
-from promo_validator import PromoProcessor
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -125,7 +122,7 @@ def process_product(product, store_dict):
     category = taxonomies[0]['department']['name']
     sub_category = taxonomies[0]['commodity']['name']
     product_title = product['item']['description']
-    weight = product['item'].get('weight', "")
+    weight = product['item'].get('weight', "Approx")
     customer_facing_size = product['item']['customerFacingSize']
     
     price_dict = product.get('price', {})
@@ -143,8 +140,7 @@ def process_product(product, store_dict):
     price_offer_code = price_dict.get('offerCode', '')
     crawl_date = str(datetime.now().date())
     
-    pattern = r'^\$\d+\.\d{2}$'
-    if promo_description and not re.match(pattern, promo_description):
+    if promo_description:
     
         product_data = {
             "zipcode": store_dict['postalCode'],
@@ -184,11 +180,18 @@ async def process_batch(batch, store_dict, headers, output_filename):
     TOTAL_PROCESSED += len(batch)
     logger.info(f"Processed {TOTAL_PROCESSED} products")
 
-async def scrape():
+async def scrape(crawl=True):
+    output_filename = Path(f"marianos_raw_{datetime.now().date()}.csv")
+    if not crawl and output_filename.exists():
+        return output_filename
+    
+    if output_filename.exists():
+        output_filename.unlink()
+    
     search_postal_code = "60453"
     store_dict = await get_store_details(search_postal_code)
     upc_list = await get_product_urls()
-    output_filename = Path(f"marianos_raw_{datetime.now().date()}.csv")
+    
     
     headers = {
         'accept': 'application/json, text/plain, */*',
@@ -229,6 +232,7 @@ async def scrape():
             }
         ])
     }
+
 
     batch_size = 200
     tasks = []

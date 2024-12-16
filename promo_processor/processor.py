@@ -2,10 +2,12 @@ import re
 import json
 import logging
 from logging.handlers import RotatingFileHandler
-from typing import Dict, Any, TypeVar, Union, List
+from typing import Dict, Any, TypeVar, Union, List, Callable, Tuple
 from pathlib import Path
 from abc import ABC, abstractmethod
-
+from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
 T = TypeVar("T", bound="PromoProcessor")
 
@@ -18,126 +20,190 @@ logging.getLogger().addHandler(handler)
 class PromoProcessor(ABC):
     subclasses = []
     results = []
+    _lock = threading.Lock()
     NUMBER_MAPPING = {"ONE": 1, "TWO": 2, "THREE": 3, "FOUR": 4, "FIVE": 5, "SIX": 6, "SEVEN": 7, "EIGHT": 8, "NINE": 9, "TEN": 10}
+    _store_brands = {
+        'marianos': frozenset(["Private Selection", "Kroger", "Simple Truth", "Simple Truth Organic"]),
+        'target': frozenset(["Deal Worthy", "Good & Gather", "Market Pantry", "Favorite Day", "Kindfull", "Smartly", "Up & Up"]),
+        'jewel': frozenset(['Lucerne', "Signature Select", "O Organics", "Open Nature", "Waterfront Bistro", "Primo Taglio",
+                    "Soleil", "Value Corner", "Ready Meals"]),
+        'walmart': frozenset(["Clear American", "Great Value", "Home Bake Value", "Marketside", 
+                    "Co Squared", "Best Occasions", "Mash-Up Coffee", "World Table"])
+    }
+    _compiled_patterns = {}
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
         PromoProcessor.subclasses.append(cls)
-        cls.logger = logging.getLogger(cls.__name__)
+    
+    def __init__(self) -> None:
+        super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         PromoProcessor.set_processor_precedence()
+        self.update_save()
 
     @classmethod
-    def apply_store_brands(cls, item: Dict[str, Any]) -> Dict[str, Any]:
-        store_brands = {
-            'marianos': ["Private Selection", "Kroger", "Simple Truth", "Simple Truth Organic"],
-            'target': ["Deal Worthy", "Good & Gather", "Market Pantry", "Favorite Day", "Kindfull", "Smartly", "Up & Up"],
-            'jewel': ['Lucerne', "Signature Select", "O Organics", "Open Nature", "Waterfront Bistro", "Primo Taglio",
-                      "Soleil", "Value Corner", "Ready Meals"],
-            'walmart': ["Clear American", "Great Value", "Home Bake Value", "Marketside", 
-                        "Co Squared", "Best Occasions", "Mash-Up Coffee", "World Table"]
-        }
-        store_brands_list = [brand for brands in store_brands.values() for brand in brands if brand.casefold() in item["product_title"].casefold()]    
-        item["store_brand"] = "y" if any(store_brands_list) else "n"
-        return item
+    def apply(cls, func: Callable[[List[Dict[str, Any]]], List[Dict[str, Any]]]) -> T:
+        cls.results = func(cls.results)
+        return cls
+
+    def update_save(self):
+        with open("patterns.json", "w") as f:
+            patterns = [pattern for subclass in self.subclasses for pattern in subclass.patterns]
+            json.dump(patterns, f, indent=4)
+    
+
+    @classmethod
+    @lru_cache(maxsize=1024)
+    def apply_store_brands(cls, product_title: str) -> str:
+        title_lower = product_title.casefold()
+        for brands in cls._store_brands.values():
+            if any(brand.casefold() in title_lower for brand in brands):
+                return "yes"
+        return "no"
 
     @property
     @abstractmethod
     def patterns(self):
-        """Each subclass must define its own patterns."""
         pass
 
     @abstractmethod
     def calculate_deal(self, item_data: Dict[str, Any], match: re.Match) -> Dict[str, Any]:
-        """Each subclass should implement deal calculation logic here."""
         pass
 
     @abstractmethod
     def calculate_coupon(self, item_data: Dict[str, Any], match: re.Match) -> Dict[str, Any]:
-        """Each subclass should implement coupon calculation logic here."""
         pass
 
     @classmethod
     def process_item(cls, item_data: Dict[str, Any]) -> T:
-        """Process a list of items or a single item."""
         if isinstance(item_data, list):
-            cls.results.extend([cls.apply_store_brands(cls.process_single_item(item)) for item in item_data])
+            with ThreadPoolExecutor() as executor:
+                processed_items = list(executor.map(cls.process_single_item, item_data))
+            with cls._lock:
+                cls.results.extend(processed_items)
         else:
-            cls.results.append(cls.apply_store_brands(cls.process_single_item(item_data)))
+            processed_item = cls.process_single_item(item_data)
+            with cls._lock:
+                cls.results.append(processed_item)
         return cls
 
     @classmethod
     def to_json(cls, filename: Union[str, Path]) -> None:
+        if not isinstance(filename, Path):
+            filename = Path(filename)
+        filename = filename.with_suffix(".json") if not filename.suffix else filename
+        filename.parent.mkdir(parents=True, exist_ok=True)
         with open(filename, "w") as f:
             json.dump(cls.results, f, indent=4)
 
     @classmethod
-    def process_single_item(cls, item_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Processes a single item, checking all processors and patterns."""
-        updated_item = item_data.copy()
+    def _get_compiled_pattern(cls, pattern: str) -> re.Pattern:
+        if pattern not in cls._compiled_patterns:
+            cls._compiled_patterns[pattern] = re.compile(pattern, re.IGNORECASE)
+        return cls._compiled_patterns[pattern]
 
+    @classmethod
+    def find_best_match(cls, description: str, patterns: List[str]) -> Tuple[str, re.Match, int]:
+        best_score = -1
+        best_pattern = None
+        best_match = None
+        
+        for pattern in patterns:
+            compiled_pattern = cls._get_compiled_pattern(pattern)
+            match = compiled_pattern.search(description)
+            if match:
+                score = cls.calculate_pattern_precedence(pattern)
+                if score > best_score:
+                    best_score = score
+                    best_pattern = pattern
+                    best_match = match
+        
+        return best_pattern, best_match, best_score
+
+    @classmethod
+    def process_single_item(cls, item_data: Dict[str, Any]) -> Dict[str, Any]:
+        updated_item = item_data.copy()
         if not hasattr(cls, "logger"):
             cls.logger = logging.getLogger(cls.__name__)
 
-        # Process deals first across all processors and patterns
-        deal_processed = False
-        for processor_class in sorted(cls.subclasses, key=lambda x: getattr(x, 'PRECEDENCE', float('inf'))):
-            processor = processor_class()
+        sorted_processors = sorted(cls.subclasses, key=lambda x: getattr(x, 'PRECEDENCE', float('inf')))
+        
+        # Process deals
+        deals_desc = updated_item.get("volume_deals_description", "")
+        if deals_desc:
+            best_processor = None
+            best_match = None
+            best_score = -1
+            
+            for processor_class in sorted_processors:
+                processor = processor_class()
+                pattern, match, score = cls.find_best_match(deals_desc, processor.patterns)
+                if match and score > best_score:
+                    best_score = score
+                    best_match = match
+                    best_processor = processor
+            
+            if best_processor and best_match:
+                cls.logger.info(f"DEALS: {best_processor.__class__.__name__}: {deals_desc}")
+                updated_item = best_processor.calculate_deal(updated_item, best_match)
+                filt = lambda x: x.get("sale_price") == x.get("unit_price")
+                if filt(updated_item):
+                    updated_item["volume_deals_description"] = ""
+                    updated_item["volume_deals_price"] = ""
 
-            for pattern in processor.patterns:
-                deal_match = re.search(pattern, updated_item.get("volume_deals_description", ""))
-                if deal_match:
-                    cls.logger.info(f"DEALS: {processor_class.__name__}: {item_data['volume_deals_description']}")
-                    updated_item = processor.calculate_deal(updated_item, deal_match)
-                    deal_processed = True
-                    break
+        # Process coupons
+        coupon_desc = updated_item.get("digital_coupon_description", "")
+        if coupon_desc:
+            best_processor = None
+            best_match = None
+            best_score = -1
+            
+            for processor_class in sorted_processors:
+                processor = processor_class()
+                pattern, match, score = cls.find_best_match(coupon_desc, processor.patterns)
+                if match and score > best_score:
+                    best_score = score
+                    best_match = match
+                    best_processor = processor
+            
+            if best_processor and best_match:
+                cls.logger.info(f"COUPONS: {best_processor.__class__.__name__}: {coupon_desc}")
+                updated_item = best_processor.calculate_coupon(updated_item, best_match)
 
-            if deal_processed:
-                break
-        # Process coupons similarly across all processors and patterns
-        coupon_processed = False
-        for processor_class in sorted(cls.subclasses, key=lambda x: getattr(x, 'PRECEDENCE', float('inf'))):
-            processor = processor_class()
-
-            for pattern in processor.patterns:
-                coupon_match = re.search(pattern, updated_item.get("digital_coupon_description", ""))
-                if coupon_match:
-                    cls.logger.info(f"COUPONS: {processor_class.__name__}: ({item_data['digital_coupon_description']}, {pattern})")
-                    updated_item = processor.calculate_coupon(updated_item, coupon_match)
-                    coupon_processed = True
-                    break
-
-            if coupon_processed:
-                break
-
+        updated_item["store_brand"] = cls.apply_store_brands(updated_item["product_title"])
         return updated_item
 
-    @classmethod
-    def calculate_pattern_precedence(cls, pattern: str) -> int:
-        """
-        Calculate precedence score for a pattern. Higher score = higher precedence.
-        Scoring criteria:
-        - Exact matches (fewer wildcards/optional parts)
-        - Pattern length
-        - Number of capture groups
-        - Specific character classes vs general wildcards
-        """
-        score = 0
-        score += len(pattern)
-        score += len(re.findall(r'\(.*?\)', pattern)) * 10
-        score -= len(re.findall(r'[\.\*\+\?\[\]]', pattern)) * 5
-        score += len(re.findall(r'\[.*?\]', pattern)) * 3
-        score += len(re.findall(r'\b', pattern)) * 2
+    @staticmethod
+    @lru_cache(maxsize=1024)
+    def calculate_pattern_precedence(pattern: str) -> int:
+        score = len(pattern) * 2
+        score += len(re.findall(r'\((?!\?:).*?\)', pattern)) * 15
+        score -= len(re.findall(r'[\*\+\?]', pattern)) * 8
+        score -= len(re.findall(r'\{.*?\}', pattern)) * 6
+        score -= len(re.findall(r'\.', pattern)) * 4
+        score += len(re.findall(r'\[.*?\]', pattern)) * 5
+        score += len(re.findall(r'\b', pattern)) * 3
+        score += len(re.findall(r'\^|\$', pattern)) * 4
+        score += len(re.findall(r'\(\?:.*?\)', pattern)) * 8
         return score
 
     @classmethod
     def set_processor_precedence(cls) -> None:
-        """
-        Set precedence for all processor subclasses based on their patterns.
-        Higher precedence = processed first
-        """
         for processor_class in cls.subclasses:
-            max_pattern_score = 0
-            for pattern in processor_class.patterns:
-                pattern_score = cls.calculate_pattern_precedence(pattern)
-                max_pattern_score = max(max_pattern_score, pattern_score)
-            processor_class.PRECEDENCE = max_pattern_score
+            processor_class.PRECEDENCE = max(
+                (cls.calculate_pattern_precedence(pattern) for pattern in processor_class.patterns),
+                default=0
+            )
+
+    @classmethod
+    @lru_cache(maxsize=1024)
+    def matcher(cls, description: str) -> str:
+        return max(
+            ((pattern, cls.calculate_pattern_precedence(pattern))
+             for processor_class in cls.subclasses
+             for pattern in processor_class.patterns
+             if cls._get_compiled_pattern(pattern).search(description)),
+            key=lambda x: x[1],
+            default=(None, -1)
+        )[0]

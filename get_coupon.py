@@ -3,8 +3,9 @@ import pandas as pd
 import aiohttp
 import asyncio
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from config import Config
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -117,9 +118,18 @@ async def process_coupons():
     logger.info(f"Completed processing all coupons. Total UPCs: {len(data_list)}")
     return data_list
 
-async def main():
+async def get_coupons(crawl=True):
+    output_filename = Path(f"marianos_coupons_{datetime.now().date()}.json")
+    if not crawl and output_filename.exists():
+        return output_filename
+    
+    if output_filename.exists():
+        output_filename.unlink()
+    
     result = await process_coupons()
-    return result
+    with open(output_filename, 'w') as f:
+        json.dump(result, f, indent=4)
+    return output_filename
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(get_coupons())

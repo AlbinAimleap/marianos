@@ -1,7 +1,7 @@
 import importlib
 import pkgutil
 from pathlib import Path
-from .processor import PromoProcessor
+from promo_processor.processor import PromoProcessor
 
 
 __all__ = []
@@ -14,6 +14,9 @@ def load_processors():
         if hasattr(module, '__all__'):
             __all__.extend(module.__all__)
         else:
-            __all__.extend([attr for attr in dir(module) if not attr.startswith('_') and issubclass(getattr(module, attr), PromoProcessor)])
+            __all__.extend([attr for attr in dir(module) 
+                          if not attr.startswith('_') 
+                          and isinstance(getattr(module, attr), type)
+                          and issubclass(getattr(module, attr), PromoProcessor)])
 
 load_processors()

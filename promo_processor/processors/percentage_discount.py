@@ -4,6 +4,7 @@ class PercentageDiscountProcessor(PromoProcessor):
     patterns = [
         r"^Deal:\s+(?P<discount>\d+)%\s+off", 
         r"^Save\s+(?P<discount>\d+)%\s+on\s+(?P<product>[\w\s-]+)",
+        r"^Save\s+(?P<discount>\d+)%\s+off\s+(?P<product>[\w\s-]+)",
         r"^(?P<discount>\d+)%\s+off\s+(?P<product>[\w\s-]+)",
     ]
     
