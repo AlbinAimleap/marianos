@@ -157,10 +157,10 @@ class PromoProcessor(ABC):
                 cls.logger.info(f"DEALS: {best_processor.__class__.__name__}: {deals_desc}")
                 updated_item = best_processor.calculate_deal(updated_item, best_match)
                 filt = lambda x: x.get("sale_price") == x.get("unit_price")
-                if filt(updated_item):
+                if updated_item and filt(updated_item):
                     updated_item["volume_deals_description"] = ""
                     updated_item["volume_deals_price"] = ""
-
+        if not updated_item: return {}
         # Process coupons
         coupon_desc = updated_item.get("digital_coupon_description", "")
         if coupon_desc:

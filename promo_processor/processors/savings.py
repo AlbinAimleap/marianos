@@ -16,12 +16,11 @@ class SavingsProcessor(PromoProcessor):
         savings_value = float(match.group('savings'))
         price = item_data.get('sale_price') or item_data.get('regular_price')
         
-        price_for_quantity = price * quantity
-        savings_value_for_quantity = price_for_quantity - savings_value
-        
         quantity = 1
         if 'quantity' in match.groupdict() and match.group('quantity'):
             quantity = float(match.group('quantity'))
+            price_for_quantity = price * quantity
+            savings_value_for_quantity = price_for_quantity - savings_value
             volume_deals_price = price 
             unit_price = savings_value_for_quantity / quantity
         else:

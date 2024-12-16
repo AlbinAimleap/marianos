@@ -13,7 +13,7 @@ class SelectProductPriceProcessor(PromoProcessor):
         weight = item_data.get('weight', 1)
         
         item_data["volume_deals_price"] = round(select_price, 2)
-        item_data["unit_price"] = round(select_price / weight if weight else 1, 2)
+        item_data["unit_price"] = round(select_price / 1, 2)
         item_data["digital_coupon_price"] = ""
         
 
@@ -23,7 +23,7 @@ class SelectProductPriceProcessor(PromoProcessor):
         select_price = float(match.group('price'))
         weight = item_data.get('weight', 1)
         
-        item_data["unit_price"] = round(select_price / weight if weight else 1, 2)
+        item_data["unit_price"] = round(select_price / 1, 2)
         item_data["digital_coupon_price"] = round(select_price, 2)
         return item_data
         
