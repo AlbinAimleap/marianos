@@ -9,7 +9,7 @@ from datetime import datetime
 from promo_processor import PromoProcessor
 from utils import reformat_data
 from pathlib import Path
-
+from utils import try_except
 
 
 def remove_invalid_promos(description):
@@ -18,6 +18,20 @@ def remove_invalid_promos(description):
     description = re.sub(r'^\$\d+\.\d{2}$', '', description)
     return description.strip()
 
+def skip_invalids(data):
+    for item in data:
+        sale_price = float(item.get("sale_price", 0) or 0)
+        regular_price = float(item.get("regular_price", 0) or 0)
+        
+        if item.get("unit_price") and item["unit_price"] < 0:
+            volume_deals_price = float(item.get("volume_deals_price", 0) or 0)
+            digital_coupon_price = float(item.get("digital_coupon_price", 0) or 0)
+            
+            if volume_deals_price and (volume_deals_price > sale_price or volume_deals_price > regular_price or volume_deals_price == sale_price):
+                item.update({"volume_deals_description": "", "volume_deals_price": "", "unit_price": ""})
+            elif digital_coupon_price and (digital_coupon_price > sale_price or digital_coupon_price > regular_price or digital_coupon_price == sale_price):
+                item.update({"digital_coupon_description": "", "digital_coupon_price": "", "unit_price": ""})
+    return data
 
 def reorder_item(data):
     order = [
@@ -73,6 +87,7 @@ async def main():
     processed_data = PromoProcessor.process_item(data)
     # processed_data.apply(filter_final)
     processed_data.apply(reorder_item)
+    processed_data.apply(skip_invalids)
     processed_data.to_json(Path(f"marianos_{datetime.now().date()}.json"))
     
 

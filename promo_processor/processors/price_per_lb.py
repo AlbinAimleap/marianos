@@ -19,7 +19,7 @@ class PricePerLbProcessor(PromoProcessor):
         #     total_price = float(price_per_lb) * float(weight)
         #     item_data["volume_deals_price"] = round(total_price, 2)
         #     item_data["unit_price"] = round(price_per_lb, 2)
-        #     item_data["digital_coupon_price"] = ""
+        #     item_data["digital_coupon_price"] = 0
         return item_data
 
 

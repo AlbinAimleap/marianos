@@ -6,8 +6,8 @@ class SavingsProcessor(PromoProcessor):
     r'^Save\s+\$(?P<savings>\d+\.\d{2})\s+(?!on\s+(?P<quantity>\d+)\s+)',  # Matches "Save $3.00" but excludes "on X ..."
     r'^Save\s+\$(?P<savings>\d+(?:\.\d{2})?)',  # Matches "Save $3.00" or "Save $3"
     r'^Save\s+\$(?P<savings>0?\.\d{2})\s+on\s+(?P<quantity>\d+)\s+',  # Matches "Save $0.05 on 10 ..."
+    r'^Save\s+\$(?P<savings>\.25)\s+',  # Matches "Save $.25 "
 ]
-
     
        
     def calculate_deal(self, item, match):
@@ -29,7 +29,7 @@ class SavingsProcessor(PromoProcessor):
             
         item_data["volume_deals_price"] = round(volume_deals_price, 2)
         item_data["unit_price"] = round(unit_price, 2)
-        item_data["digital_coupon_price"] = ""
+        item_data["digital_coupon_price"] = 0
         return item_data
         
 

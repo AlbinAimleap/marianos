@@ -16,9 +16,9 @@ class SpendSavingsProcessor(PromoProcessor):
         discount_rate = savings_value / spend_requirement
         unit_price = price - (price * discount_rate)
     
-        item_data["volume_deals_price"] = round(price - unit_price, 2)
+        item_data["volume_deals_price"] = round(unit_price, 2)
         item_data["unit_price"] = round(unit_price / 1, 2)
-        item_data["digital_coupon_price"] = ""
+        item_data["digital_coupon_price"] = 0
         return item_data
     
 
@@ -32,6 +32,6 @@ class SpendSavingsProcessor(PromoProcessor):
         discount_rate = savings_value / spend_requirement
         unit_price = price - (price * discount_rate)
     
-        item_data["unit_price"] = round(price - unit_price, 2)
-        item_data["digital_coupon_price"] = round(discount_rate, 2)
+        item_data["unit_price"] = round(unit_price, 2)
+        item_data["digital_coupon_price"] = round((price * discount_rate), 2)
         return item_data

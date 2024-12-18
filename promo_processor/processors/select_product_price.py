@@ -14,7 +14,7 @@ class SelectProductPriceProcessor(PromoProcessor):
         
         item_data["volume_deals_price"] = round(select_price, 2)
         item_data["unit_price"] = round(select_price / 1, 2)
-        item_data["digital_coupon_price"] = ""
+        item_data["digital_coupon_price"] = 0
         
 
     def calculate_coupon(self, item, match):

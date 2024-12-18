@@ -17,7 +17,7 @@ class DollarDiscountProcessor(PromoProcessor):
         
         item_data["volume_deals_price"] = round(volume_deals_price, 2)
         item_data["unit_price"] = round(volume_deals_price / 1, 2)
-        item_data["digital_coupon_price"] = ""
+        item_data["digital_coupon_price"] = 0
         return item_data
         
  

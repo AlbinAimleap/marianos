@@ -160,6 +160,7 @@ class PromoProcessor(ABC):
                 if updated_item and filt(updated_item):
                     updated_item["volume_deals_description"] = ""
                     updated_item["volume_deals_price"] = ""
+                    
         if not updated_item: return {}
         # Process coupons
         coupon_desc = updated_item.get("digital_coupon_description", "")

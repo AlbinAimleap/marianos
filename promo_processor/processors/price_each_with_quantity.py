@@ -16,7 +16,7 @@ class PriceEachWithQuantityProcessor(PromoProcessor):
         
         item_data["volume_deals_price"] = round(total_price, 2)
         item_data["unit_price"] = round(price_each, 2)
-        item_data["digital_coupon_price"] = ""
+        item_data["digital_coupon_price"] = 0
         return item_data
 
     def calculate_coupon(self, item, match):

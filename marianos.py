@@ -34,9 +34,10 @@ async def get_store_details(search_postal_code):
         'filter.query': search_postal_code,
         'projections': 'full',
     }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get('https://www.marianos.com/atlas/v1/stores/v2/locator', params=params, headers=headers) as response:
+    proxy = "http://aimleap:VKOGGUP-VDW11QX-GJHM5VF-DLBJIMH-HJVFAIM-DVOA1GG-MMHC46T@global.rotating.proxyrack.net:9000"
+    connector = aiohttp.TCPConnector(ssl=False)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        async with session.get('https://www.marianos.com/atlas/v1/stores/v2/locator', params=params, headers=headers, proxy=proxy) as response:
             data_dict = await response.json()
     
     stores = data_dict['data']['stores']
@@ -65,6 +66,7 @@ async def get_product_urls():
         'sec-fetch-site': 'same-origin',
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36',
     }
+    proxy = "http://aimleap:VKOGGUP-VDW11QX-GJHM5VF-DLBJIMH-HJVFAIM-DVOA1GG-MMHC46T@global.rotating.proxyrack.net:9000"
     async with aiohttp.ClientSession() as session:
         async with session.get("https://www.marianos.com/product-details-sitemap.xml", headers=headers) as response:
             text = await response.text()
@@ -96,7 +98,7 @@ async def get_product_data(upc_list, store_dict, headers):
     }
     
     async with aiohttp.ClientSession() as session:
-        for _ in range(5):
+        for _ in range(10):
             try:
                 async with session.get('https://www.marianos.com/atlas/v1/product/v2/products', params=params, headers=headers, timeout=30) as response:
                     response.raise_for_status()
@@ -106,7 +108,7 @@ async def get_product_data(upc_list, store_dict, headers):
                 logger.error(f"Error retrieving product data. Retrying...")
                 await asyncio.sleep(10)
     
-    logger.error("Failed to retrieve product data after 5 attempts")
+    logger.error("Failed to retrieve product data after 10 attempts")
     return []
 
 def process_product(product, store_dict): 
