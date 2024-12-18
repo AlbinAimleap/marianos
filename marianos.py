@@ -107,7 +107,7 @@ async def get_product_data(upc_list, store_dict, headers):
             except Exception as e:
                 logger.error(f"Error retrieving product data. Retrying...")
                 await asyncio.sleep(10)
-    
+    with open("missing_upcs.txt", "a") as f: f.write("\n".join(upc_list))
     logger.error("Failed to retrieve product data after 10 attempts")
     return []
 

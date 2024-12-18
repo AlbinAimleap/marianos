@@ -13,8 +13,8 @@ from utils import try_except
 
 
 def remove_invalid_promos(description):
-    description = re.sub(r'\$\d+\.\d+/lb', '', description)
-    description = re.sub(r'about \$\d+\.\d+ each', '', description)
+    # description = re.sub(r'\$\d+\.\d+/lb', '', description)
+    # description = re.sub(r'about \$\d+\.\d+ each', '', description)
     description = re.sub(r'^\$\d+\.\d{2}$', '', description)
     return description.strip()
 
@@ -66,6 +66,14 @@ def filter_final(data):
         json.dump(filtered_data, f, indent=4)
     return filtered_data
     
+def format_zeros(data):
+    keys = ["regular_price", "sale_price", "volume_deals_price", "digital_coupon_price", "unit_price"]
+    for item in data:
+        for key in keys:
+            if item[key] == 0:
+                item[key] = ""
+    return data
+
 async def main():
     output_file = await scrape(crawl=False)
     coupons_file = await get_coupons(crawl=False)
@@ -88,6 +96,7 @@ async def main():
     # processed_data.apply(filter_final)
     processed_data.apply(reorder_item)
     processed_data.apply(skip_invalids)
+    processed_data.apply(format_zeros)
     processed_data.to_json(Path(f"marianos_{datetime.now().date()}.json"))
     
 

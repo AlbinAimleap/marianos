@@ -44,26 +44,43 @@ def split_promos(data):
         
     return data
     
-
-
 def skip_invalids(data):
-    return [i for i in data if not i["unit_price"] or (i["unit_price"] and i["unit_price"] > 0)]
-    
+    for item in data:
+        sale_price = float(item.get("sale_price", 0) or 0)
+        regular_price = float(item.get("regular_price", 0) or 0)
+        
+        if item.get("unit_price") and item["unit_price"] < 0:
+            volume_deals_price = float(item.get("volume_deals_price", 0) or 0)
+            digital_coupon_price = float(item.get("digital_coupon_price", 0) or 0)
+            
+            if volume_deals_price and (volume_deals_price > sale_price or volume_deals_price > regular_price or volume_deals_price == sale_price):
+                item.update({"volume_deals_description": "", "volume_deals_price": "", "unit_price": ""})
+            elif digital_coupon_price and (digital_coupon_price > sale_price or digital_coupon_price > regular_price or digital_coupon_price == sale_price):
+                item.update({"digital_coupon_description": "", "digital_coupon_price": "", "unit_price": ""})
+    return data
+def format_zeros(data):
+    keys = ["regular_price", "sale_price", "volume_deals_price", "digital_coupon_price", "unit_price"]
+    for item in data:
+        for key in keys:
+            if item[key] == 0:
+                item[key] = ""
+    return data
+  
 def main():
-    output_file = Path(r"C:\Users\Albia\Downloads\Marianos_Code\Marianos_Code\16-12-2024-grocessary-Target-v1 1.xlsx")
+    output_file = Path(r"C:\Users\Albia\Downloads\Marianos_Code\Marianos_Code\18-12-2024-Grocessory-Target-output-v2 1.xlsx")
     df = pd.read_excel(output_file)
     df['upc'] = df['upc'].astype(str).str.zfill(13)
     
     df.fillna(value="", inplace=True)
-    df['volume_deals_description'] = df['volume_deals_description'].apply(remove_invalid_promos)
+    # df['volume_deals_description'] = df['volume_deals_description'].apply(remove_invalid_promos)
     df.fillna(value="", inplace=True)
     data = df.to_dict(orient='records')
     processed_data = PromoProcessor.pre_process(split_promos)
     processed_data = processed_data.process_item(data)
     processed_data.apply(reorder_item)
     processed_data.apply(skip_invalids)
-    processed_data.apply(split_promos)
-    processed_data.to_json(Path(f"taret_{datetime.now().date()}.json"))
+    processed_data.apply(format_zeros)
+    processed_data.to_json(Path(f"target_{datetime.now().date()}.json"))
     
 
 if __name__ == "__main__":

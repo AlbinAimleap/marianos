@@ -135,7 +135,7 @@ class PromoProcessor(ABC):
         updated_item = item_data.copy()
         if not hasattr(cls, "logger"):
             cls.logger = logging.getLogger(cls.__name__)
-
+        upc = updated_item.get("upc", "")
         sorted_processors = sorted(cls.subclasses, key=lambda x: getattr(x, 'PRECEDENCE', float('inf')))
         
         # Process deals
@@ -154,7 +154,7 @@ class PromoProcessor(ABC):
                     best_processor = processor
             
             if best_processor and best_match:
-                cls.logger.info(f"DEALS: {best_processor.__class__.__name__}: {deals_desc}")
+                cls.logger.info(f"UPC: {upc}: DEALS: {best_processor.__class__.__name__}: {deals_desc}")
                 updated_item = best_processor.calculate_deal(updated_item, best_match)
                 filt = lambda x: x.get("sale_price") == x.get("unit_price")
                 if updated_item and filt(updated_item):
@@ -178,7 +178,7 @@ class PromoProcessor(ABC):
                     best_processor = processor
             
             if best_processor and best_match:
-                cls.logger.info(f"COUPONS: {best_processor.__class__.__name__}: {coupon_desc}")
+                cls.logger.info(f"UPC: {upc}: COUPONS: {best_processor.__class__.__name__}: {coupon_desc}")
                 updated_item = best_processor.calculate_coupon(updated_item, best_match)
 
         updated_item["store_brand"] = cls.apply_store_brands(updated_item["product_title"])

@@ -14,7 +14,7 @@ class AddTotalForOfferProcessor(PromoProcessor):
         
         item_data['volume_deals_price'] = round(unit_price * quantity, 2)
         item_data['unit_price'] = round(unit_price, 2)
-        item_data['digital_coupon_price'] = ""
+        item_data['digital_coupon_price'] = 0
         return item_data
 
     def calculate_coupon(self, item, match):
