@@ -26,24 +26,39 @@ def reorder_item(data):
     return [{key: item.get(key, "") for key in order}  for item in data if item]
 
 def split_promos(data):
-    
+    new_data = []
     for item in data:
         if not item["digital_coupon_description"]:
+            new_data.append(item.copy())
             continue
         promos = item["digital_coupon_description"].split(";")
-        amounts = []
-        
         for promo in promos:
-            match = re.search(r'\$(\d+\.?\d*)', promo.strip())
-            if match:
-                amounts.append(float(match.group(1)))
+            item["digital_coupon_description"] = promo.strip()
+            new_data.append(item.copy())
+    return new_data
+
+def get_lowest_unit_price(data):
+    if not data:
+        return data
         
-        if amounts:
-            highest_promo = max(amounts)
-            item["digital_coupon_description"] = f"${highest_promo:.2f} off"
-        
-    return data
+    data = sorted(data, key=lambda x: x.get("upc"))
+    i = 0
     
+    while i < len(data) - 1:
+        try:
+            if data[i]["upc"] == data[i + 1]["upc"]:
+                if not data[i]["unit_price"]:
+                    data[i]["unit_price"] = 0
+                if not data[i + 1]["unit_price"]:
+                    data[i + 1]["unit_price"] = 0
+                if data[i]["unit_price"] > data[i + 1]["unit_price"]:
+                    data[i]["unit_price"] = data[i + 1]["unit_price"]
+                data.pop(i + 1)
+            else:
+                i += 1
+        except IndexError:
+            break
+    return data    
 def skip_invalids(data):
     for item in data:
         sale_price = float(item.get("sale_price", 0) or 0)
@@ -67,20 +82,18 @@ def format_zeros(data):
     return data
   
 def main():
-    output_file = Path(r"C:\Users\Albia\Downloads\Marianos_Code\Marianos_Code\20-12-2024-Grocessary-Target-output-v1 1.xlsx")
-    df = pd.read_excel(output_file)
+    output_file = Path(r"C:\Users\Albia\Downloads\Marianos_Code\Marianos_Code\Jewelosco_pre_processed_20241224_v2.json")
+    df = pd.read_json(output_file)
     df['upc'] = df['upc'].astype(str).str.zfill(13)
-    
-    df.fillna(value="", inplace=True)
-    # df['volume_deals_description'] = df['volume_deals_description'].apply(remove_invalid_promos)
     df.fillna(value="", inplace=True)
     data = df.to_dict(orient='records')
     processed_data = PromoProcessor.pre_process(split_promos)
     processed_data = processed_data.process_item(data)
     processed_data.apply(reorder_item)
     processed_data.apply(skip_invalids)
+    processed_data.apply(get_lowest_unit_price)
     processed_data.apply(format_zeros)
-    processed_data.to_json(Path(f"target_{datetime.now().date()}.json"))
+    processed_data.to_json(Path(f"jewelosco_{datetime.now().date()}.json"))
     
 
 if __name__ == "__main__":
