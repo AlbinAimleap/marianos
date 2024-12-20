@@ -2,9 +2,10 @@ from promo_processor.processor import PromoProcessor
 from typing import Dict, Any
 import re
 
-class FixedPriceMealProcessor(PromoProcessor):
+class FixedPriceProcessor(PromoProcessor):
     patterns = [
-        r'^\$(?P<price>\d+\.?\d*)$'
+        r'^\$(?P<price>\d+\.?\d*)$',
+        r'^\$(?P<price>\d+\.?\d*)\s+price\s'
     ]
     
     def calculate_deal(self, item: Dict[str, Any], match: re.Match) -> Dict[str, Any]:
